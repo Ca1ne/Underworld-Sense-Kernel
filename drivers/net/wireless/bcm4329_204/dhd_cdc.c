@@ -1012,7 +1012,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	uint32 dongle_align = DHD_SDALIGN;
 	uint32 glom = 0;
 
+#ifdef HIDE_WIRELESS_N_SUPPORT
 	uint32 nmode = 0;
+#endif
 	uint bcn_timeout = 5;
 /* Disable ARP off-load first
  */
@@ -1105,12 +1107,14 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
 #endif
 
+#ifdef HIDE_WIRELESS_N_SUPPORT
 	if(!wifi_get_dot11n_enable()) {
 		/* Disable nmode as default */
 		bcm_mkiovar("nmode", (char *)&nmode, 4, iovbuf, sizeof(iovbuf));
 		dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
 		myprintf("wifi: Disable 802.11n\n");
 	}
+#endif
 	/* Force STA UP */
 	dhdcdc_set_ioctl(dhd, 0, WLC_UP, (char *)&up, sizeof(up));
 
