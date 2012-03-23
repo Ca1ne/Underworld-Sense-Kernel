@@ -1280,6 +1280,21 @@ static int atmel_ts_probe(struct i2c_client *client,
 		ts->id->matrix_x_size, ts->id->matrix_y_size,
 		ts->id->num_declared_objects);
 
+/*
+	Begin ffolkes multitouch selection
+	Purpose: Some hardware can't support more than 3 multitouch points, so 		revert back to 3 if we find a 004F touch sensor
+	BEGIN
+*/
+	if(ts->id->family_id == 0x4F && pdata->config_T9[14] != 3) {
+		printk(KERN_INFO "%d point multitouch disabled due to possible hardware conflict, reverting to 3 point\n", pdata->config_T9[14]);
+		pdata->config_T9[14] = 3;
+	} else {
+		printk(KERN_INFO "%d point multitouch enabled\n", pdata->config_T9[14]);
+	}
+/*
+	END
+*/
+
 	/* Read object table. */
 	ret = read_object_table(ts);
 	if (ret < 0)
