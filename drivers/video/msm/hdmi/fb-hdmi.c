@@ -68,6 +68,9 @@ struct hdmifb_info {
 	int yres;
 	unsigned long state;
 	atomic_t use_count;
+    struct mdp_blit_req mirrorReq;
+    bool blitOnVsync;
+    bool mirroring;
 };
 
 static struct mdp_device *mdp;
@@ -77,6 +80,14 @@ static unsigned PP[16];
 
 void hdmi_pre_change(struct hdmi_info *hdmi);
 void hdmi_post_change(struct hdmi_info *info, struct fb_var_screeninfo *var);
+
+int hdmifb_pause(struct fb_info *fb, unsigned int mode);
+
+bool mirroring_reportBlit(struct fb_info *src, struct fb_info *dst, struct mdp_blit_req* req);
+bool mirroring_hdmi_enable_requested(void);
+bool mirroring_hdmi_disable_requested(void);
+void mirroring_getSettings(struct mirror_settings* settings);
+void mirroring_setSettings(struct mirror_settings* settings);
 
 static int hdmifb_open(struct fb_info *info, int user)
 {
@@ -220,9 +231,57 @@ int hdmifb_get_mode(void)
         return test_bit(hdmi_mode, &_hdmi_fb->state);
 }
 
+struct fb_info* hdmi_get_fb_info(void)
+{
+    return _hdmi_fb->fb;
+}
+
+bool hdmi_IsEnabled(void)
+{
+    if ((test_bit(fb_enabled, &_hdmi_fb->state) == 0) ||
+        (test_bit(hdmi_enabled, &_hdmi_fb->state) == 0))
+        return false;
+    return true;
+}
+
+bool hdmi_isCableConnected(void)
+{
+    int connect;
+    hdmi->get_cable_state(hdmi, &connect);
+
+    return connect ? true : false;
+}
+
+int hdmi_startMirroring(int reason)
+{
+    // We're not going to fire up if there's no cable connected.
+    if (!hdmi_isCableConnected())
+        return 1;
+
+    _hdmi_fb->mirroring = true;
+    if (test_bit(hdmi_enabled, &_hdmi_fb->state) == 0)
+    {
+        hdmifb_pause(hdmi_get_fb_info(), 0);
+    }
+    hdmifb_change_mode(hdmi_get_fb_info(), 1);
+    hdmifb_pan_update(hdmi_get_fb_info(), 0, 0, _hdmi_fb->xres, _hdmi_fb->yres, 0);
+    return 1;
+}
+
+int hdmi_stopMirroring(int reason)
+{
+    _hdmi_fb->mirroring = false;
+    if (reason == 0)
+    {
+        // If we're cable disconnect, stop the hdmi buffer
+        hdmifb_pause(hdmi_get_fb_info(), 1);
+    }
+    return 1;
+}
+
 bool hdmifb_suspending = false;
 
-static int hdmifb_pause(struct fb_info *fb, unsigned int mode)
+int hdmifb_pause(struct fb_info *fb, unsigned int mode)
 {
 	int ret = 0;
 	struct hdmifb_info *hdmi_fb = fb->par;
@@ -293,6 +352,40 @@ static int hdmifb_blit(struct fb_info *info, void __user *p)
 	return 0;
 }
 
+void hdmi_blit_on_vsync(struct mdp_blit_req* blitReq)
+{
+    struct msm_panel_data *panel = _hdmi_fb->panel;
+
+    /* Request mirror blit and vsync callback */
+    _hdmi_fb->blitOnVsync = true;
+    panel->request_vsync(panel, &_hdmi_fb->vsync_callback);
+    return;
+}
+
+void hdmi_reportBlit(struct fb_info *info)
+{
+    /* Verify HDMI is enabled */
+    if ((test_bit(fb_enabled, &_hdmi_fb->state) == 0) ||
+        (test_bit(hdmi_enabled, &_hdmi_fb->state) == 0))
+    {
+        return;
+    }
+
+    if (!_hdmi_fb->mirroring)
+    {
+        return;
+    }
+
+    /* On failure, we'll disable mirroring */
+    if (!mirroring_reportBlit(info, _hdmi_fb->fb, &_hdmi_fb->mirrorReq))
+    {
+        HDMI_DBG("reportBlit failed.\n");
+        _hdmi_fb->mirroring = false;
+    }
+
+    return;
+}
+
 enum ioctl_cmd_index {
        CMD_SET_MODE,
        CMD_GET_MODE,
@@ -317,14 +410,18 @@ static char *cmd_str[] = {
 };
 */
 
+struct hdmi_info* hdmi_get_hdmi_info(void)
+{
+    return container_of(hdmi, struct hdmi_info, hdmi_dev);
+}
+
 static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 {
 	struct hdmifb_info *hdmi_fb = p->par;
 	void __user *argp = (void __user *)arg;
 	unsigned int val;
 	int ret = -EINVAL;
-        struct hdmi_info *hinfo = container_of(hdmi, struct hdmi_info,
-                                        hdmi_dev);
+    struct hdmi_info *hinfo = hdmi_get_hdmi_info();
 
 /*
 	if (cmd != HDMI_BLIT)
@@ -335,30 +432,49 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case HDMI_SET_MODE:
 		get_user(val, (unsigned __user *) arg);
-		//pr_info("[hdmi] SET_MODE: %d\n", val);
+		pr_info("[hdmi] SET_MODE: %d\n", val);
 		ret = hdmifb_change_mode(p, val);
 		break;
 	case HDMI_GET_MODE:
-/*
-		pr_info("[hdmi] GET_MODE: %d\n",
-			test_bit(hdmi_mode, &hdmi_fb->state));
-*/
-		ret = put_user(test_bit(hdmi_mode, &hdmi_fb->state),
+        pr_info("[hdmi] GET_MODE: %d\n",
+            test_bit(hdmi_mode, &hdmi_fb->state));
+        ret = put_user(test_bit(hdmi_mode, &hdmi_fb->state),
 			(unsigned __user *) arg);
 		break;
-	case HDMI_DISABLE:
+    case HDMI_DISABLE:
+        pr_info("[hdmi] HDMI_DISABLE\n");
 		get_user(val, (unsigned __user *) arg);
-		ret = hdmifb_pause(p, 1);
+        // We will let the mirroring code take over instead of disabling
+        mirroring_hdmi_disable_requested();
 		break;
 	case HDMI_ENABLE:
-		get_user(val, (unsigned __user *) arg);
-		ret = hdmifb_pause(p, 0);
+        pr_info("[hdmi] HDMI_ENABLE\n");
+        if (hdmi_fb->mirroring)
+        {
+            // If we're already mirroring, we don't need to resume
+            mirroring_hdmi_enable_requested();
+        }
+        else
+        {
+            get_user(val, (unsigned __user *) arg);
+            ret = hdmifb_pause(p, 0);
+        }
 		break;
 	case HDMI_GET_STATE:
-		ret = put_user(test_bit(hdmi_enabled, &hdmi_fb->state),
-			(unsigned __user *) arg);
+        pr_info("[hdmi] HDMI_GET_STATE\n");
+        if (hdmi_fb->mirroring)
+        {
+            // When mirroring, we lie about the current state
+            val = 0;
+        }
+        else
+        {
+            val = test_bit(hdmi_enabled, &hdmi_fb->state);
+        }
+        ret = put_user(val, (unsigned __user *) arg);
 		break;
 	case HDMI_BLIT:
+        pr_info("[hdmi] HDMI_BLIT\n");
 		if (test_bit(hdmi_enabled, &hdmi_fb->state))
 			ret = hdmifb_blit(p, argp);
 		else
@@ -397,6 +513,23 @@ static int hdmifb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 			&dinfo, sizeof(dinfo));
 		break;
 	}
+    case HDMI_GET_MIRRORING: {
+        struct mirror_settings settings;
+        mirroring_getSettings(&settings);
+        ret = copy_to_user((unsigned __user *) arg, &settings, sizeof(struct mirror_settings));
+        break;
+    }
+    case HDMI_SET_MIRRORING: {
+        struct mirror_settings settings;
+        ret = copy_from_user(&settings, (unsigned __user *) arg, sizeof(struct mirror_settings));
+        if (ret)
+        {
+            ret = -EFAULT;
+            break;
+        }
+        mirroring_setSettings(&settings);
+        break;
+    }
 	default:
 		printk(KERN_ERR "hdmi: unknown cmd, cmd = %d\n", cmd);
 	}
@@ -453,6 +586,10 @@ static void hdmifb_resume(struct early_suspend *h)
 
 	atomic_set(&hdmi_fb->use_count, 0);
 	set_bit(fb_enabled, &hdmi_fb->state);
+    if (hdmi_fb->mirroring == 1)
+    {
+        set_bit(hdmi_enabled, &hdmi_fb->state);
+    }
 }
 #endif
 
@@ -555,6 +692,20 @@ static void hdmi_handle_vsync(struct msmfb_callback *callback)
 	struct hdmifb_info *hdmi = container_of(callback, struct hdmifb_info,
 						vsync_callback);
 	struct msm_panel_data *panel = hdmi->panel;
+
+    /* Handle blitting requests */
+    if (hdmi->mirroring)
+    {
+        if (hdmi->blitOnVsync)
+        {
+            if (mdp->blit(mdp, _hdmi_fb->fb, &hdmi->mirrorReq))
+            {
+                HDMI_DBG("mdp->blit has failed\n");
+            }
+            hdmi->blitOnVsync = false;
+        }
+        return;
+    }
 
 	spin_lock_irqsave(&hdmi->update_lock, irq_flags);
 	x = hdmi->update_info.left;
@@ -716,3 +867,4 @@ static int __init hdmifb_init(void)
 }
 
 module_init(hdmifb_init);
+

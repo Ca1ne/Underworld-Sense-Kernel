@@ -313,7 +313,6 @@ int tpi_read_edid(struct hdmi_info *hdmi)
 	u8 val;
 	int ret, edid_blocks = 0;
 	struct i2c_msg msg;
-	u8 i2c_buff[2];
 	u8 pbuf[] = {1, 0, 1, 128} ;
 
 	struct i2c_msg paging_msg[] = {
@@ -364,7 +363,7 @@ int tpi_read_edid(struct hdmi_info *hdmi)
 
 	msg.addr = 0x50;
 	msg.flags = I2C_M_RD;
-	msg.len = 128;
+	msg.len = 256;
 	msg.buf = hdmi->edid_buf;
 	ret = i2c_transfer(hdmi->client->adapter, &msg, 1);
 	if (ret < 0) {
@@ -374,24 +373,7 @@ int tpi_read_edid(struct hdmi_info *hdmi)
 		if (hdmi->edid_buf[0x7e] <= 3)
 			edid_blocks = hdmi->edid_buf[0x7e] ;
 
-                dev_info(&hdmi->client->dev, "EDID blocks = %d\n", edid_blocks);
-
-		if (edid_blocks == 0 ) {
-                        goto end_read_edid;
-                }
-		// Block-1
-		msg.addr = 0x50;
-		msg.flags = 0;
-		msg.len = 1;
-		i2c_buff[0] = 128;
-		msg.buf = i2c_buff;
-		ret = i2c_transfer(hdmi->client->adapter, &msg, 1);
-
-		msg.addr = 0x50;
-		msg.flags = I2C_M_RD;
-		msg.len = 128;
-		msg.buf = &hdmi->edid_buf[128];
-		ret = i2c_transfer(hdmi->client->adapter, &msg, 1);
+        dev_info(&hdmi->client->dev, "EDID blocks = %d\n", edid_blocks);
 	}
 
 	if (edid_blocks > 1) {
@@ -460,7 +442,7 @@ void HotPlugService (struct hdmi_info *hdmi)
 		EnableTMDS(hdmi);
 	}
 
-	if (edid_check_sink_type(hdmi))
+	if (edid_check_audio_support(hdmi))
 		avc_set_basic_audio(hdmi);
 	else
 		SetAudioMute(hdmi, AUDIO_MUTE_MUTED);
@@ -565,8 +547,10 @@ void tpi_cable_conn(struct hdmi_info *hdmi)
 
 	tpi_read_edid(hdmi);
 	memset(edid_hex_buff, 0, 2048);
-	edid_dump_hex(hdmi->edid_buf, 256, edid_hex_buff, 2048);
-	printk("EDID data:\n%s\n=====", edid_hex_buff);
+	edid_dump_hex(hdmi->edid_buf, 128, edid_hex_buff, 2048);
+	printk("Base EDID:\n%s\n=====\n", edid_hex_buff);
+    edid_dump_hex(hdmi->edid_buf + 128, 256, edid_hex_buff, 2048);
+    printk("Extended EDID blocks:\n%s\n=====\n", edid_hex_buff);
 	/* select output mode (HDMI/DVI) according to sink capabilty */
 	if (edid_check_sink_type(hdmi))
 		ReadModifyWriteTPI(hdmi, TPI_SYSTEM_CONTROL, OUTPUT_MODE_MASK, OUTPUT_MODE_HDMI);
@@ -654,6 +638,7 @@ void tpi_debug_interrupt(struct hdmi_info *hdmi, u8 old_status, u8 new_status)
 static u8 last_status = 0;
 static void tpi_poll(struct hdmi_info *hdmi)
 {
+    bool notifyConnect = false;
 	u8 status, orig_status;
 	int retry = 20;
 
@@ -700,9 +685,11 @@ static void tpi_poll(struct hdmi_info *hdmi)
 			else {
 				tpi_cable_conn(hdmi);
 				ReadModifyWriteIndexedRegister(hdmi, INDEXED_PAGE_0, 0x0A, 0x08, 0x08);
+                notifyConnect = true;
 			}
 			if (hdmi->cable_connected == false) {
 				mutex_unlock(&hdmi->polling_lock);
+                mirroring_cable_disconn(hdmi);
 				return;
 			}
 		} else if ( false == hdmi->cable_connected)
@@ -732,6 +719,11 @@ static void tpi_poll(struct hdmi_info *hdmi)
 			hdcp_check_status(hdmi, status);
 	}
 	mutex_unlock(&hdmi->polling_lock);
+
+    if (notifyConnect == true)
+    {
+        mirroring_cable_conn(hdmi);
+    }
 }
 
 static void tpi_work_func(struct work_struct *work)
@@ -958,3 +950,4 @@ int tpi_debugfs_init(struct hdmi_info *hdmi)
         return 0;
 }
 #endif
+

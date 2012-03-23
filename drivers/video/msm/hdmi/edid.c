@@ -367,42 +367,23 @@ bool edid_do_checksum(u8 *data)
 
 static bool edid_check_header(u8 *data)
 {
-	int ret, i = 0;
-	/* EDID 8 bytes header */
-	static u8 header[] = {0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0};
+    int ret = true;
 
-	for (i = 0; i < ARRAY_SIZE(header); i++)
-		if (data[i] != header[i])
-			break;
-	ret = (i == ARRAY_SIZE(header)) ? true : false;
-	EDID_DBG("%s: result=%s\n", __func__, ret ? "pass" : "fail");
+    /* EDID 8 bytes header */
+    static const u8 header[] = {0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0};
 
-	return ret;
-}
+    if (memcmp(data, header, 8) != 0)
+        ret = false;
 
-bool edid_check_hdmi_sink(struct hdmi_info *hdmi, int block)
-{
-	int ret = false, index = 4;
-	u8 *data = &hdmi->edid_buf[block * 128];
-	/* block offset where long descriptors start */
-	int long_desc_offset = data[LONG_DESCR_PTR_IDX];
-	int tag_code, data_block_len;
+    EDID_DBG("%s: result=%s\n", __func__, ret ? "pass" : "fail");
+    if (!edid_do_checksum(data))
+    {
+        pr_err("%s: checksum error\n", __func__);
 
-	while (index < long_desc_offset) {
-		tag_code = (data[index] >> 5) & 0x7;
-		data_block_len = data[index++] & 0x1f;
-		if (tag_code == VENDOR_SPEC_D_BLOCK &&
-		    data[index] == 0x03 &&
-		    data[index + 1] == 0x0c &&
-		    data[index + 2] == 0x00) {
-			ret = true;
-			break;
-		} else
-			index += data_block_len;
-	}
-	hdmi->edid_info.hdmi_sink = ret;
-	EDID_DBG("%s: ret=%s\n", __func__, ret ? "yes" : "no");
-	return ret;
+        // Not all monitors have a proper checksum, so we'll ignore this error and just log the problem.
+        // ret = false;
+    }
+    return ret;
 }
 
 struct edid_black_list_info {
@@ -457,32 +438,24 @@ u8 edid_simple_parsing(struct hdmi_info *hdmi)
 	u8 *edid_buf = hdmi->edid_buf;
 	int i, index, ret = -EINVAL;
 	struct edid_info_struct *edid_info = &hdmi->edid_info;
-	unsigned v1;
+    unsigned v1, width, height, aspect;
 	unsigned extensions;
+    unsigned extension;
 
 	EDID_DBG("%s\n", __func__);
-	// FIXME: integrate with edid_check()
-	if (!edid_do_checksum(edid_buf)) {
-		pr_err("%s: checksum error\n", __func__);
-		//return EDID_CHECKSUM_ERROR;
-	}
-	if (!edid_check_header(edid_buf)) {
+    if (!edid_check_header(edid_buf))
+    {
 		pr_err("%s: incorrect header\n", __func__);
 		return INCORRECT_EDID_HEADER;
 	}
-        edid_info->under_scan = ((edid_buf[MISC_SUPPORT_IDX]) >> 7) & 0x1;
-        edid_info->basic_audio = ((edid_buf[MISC_SUPPORT_IDX]) >> 6) & 0x1;
-        edid_info->ycbcr_4_4_4 = ((edid_buf[MISC_SUPPORT_IDX]) >> 5) & 0x1;
-        edid_info->ycbcr_4_2_2 = ((edid_buf[MISC_SUPPORT_IDX]) >> 4) & 0x1;
 
 	// FIXME: 0x7e
-	extensions = edid_buf[0x7e];
+    extensions = edid_buf[126];
 	EDID_DBG("%s: extensions=%d\n", __func__, extensions);
-	if (!extensions) {
+    if (!extensions)
+    {
 		hdmi->edid_info.hdmi_sink = false;
-		return NO_861_EXTENSIONS;
 	}
-	//return;
 
 	/* reset all supported */
 	for (i = 0 ; i < ARRAY_SIZE(additional_timing_db); i++)
@@ -490,53 +463,139 @@ u8 edid_simple_parsing(struct hdmi_info *hdmi)
 	for (i = 0 ; i < ARRAY_SIZE(established_timing_db); i++)
 		established_timing_db[i].supported = false;
 
-	/* Block 0: established timing */
-	pr_info("established timing: {%02x, %02x, %02x}\n",
-			edid_buf[35], edid_buf[36], edid_buf[37]);
+    /* Get screen width and height */
+    hdmi->edid_info.screenWidth = edid_buf[21];
+    hdmi->edid_info.screenHeight = edid_buf[22];
 
-	v1 = edid_buf[35] | edid_buf[36] << 8 | (!!edid_buf[37]) << 16;
+	/* Block 0: established timing */
+	EDID_DBG("established timing: {%02x, %02x, %02x}\n", edid_buf[35], edid_buf[36], edid_buf[37]);
+
+    v1 = edid_buf[35] | edid_buf[36] << 8;
+    if (edid_buf[37] & 0x80)
+        v1 |= 0x00010000;
 
 	for (i = 0 ; i < 17; i++ )	// 17 bits defined in established timing
 		established_timing_db[i].supported = ((v1 >>= 1) & 1) ;
 
-#if 0
+    for (i = 0 ; i < ARRAY_SIZE(established_timing_db); i++)
+    {
+        if (established_timing_db[i].supported)
+        {
+            EDID_DBG("  Established timing: %s\n", established_timing_db[i].descrption);
+        }
+    }
+
 	/* standard timing identification */
 	for (i = 0; i < 8; i++) {
-		width = edid_buf[38 + i * 2] * 8 + 248;
-		v1 = edid_buf[38 + i * 2 + 1];
+        width = (edid_buf[38 + (i * 2)] * 8) + 248;
+        v1 = edid_buf[38 + (i * 2) + 1];
 		switch (v1 >> 6) {
 		case 0: height = width * 10 / 16; aspect = ASPECT(16, 10); break;
 		case 1: height = width * 3 / 4; aspect = ASPECT(4, 3); break;
 		case 2: height = width * 4 / 5; aspect = ASPECT(5, 4); break;
 		case 3: height = width * 9 / 16; aspect = ASPECT(16, 9); break;
 		}
+        if (width == 256)   continue;
+
 		standard_timing_db[i].width = width;
 		standard_timing_db[i].height = height;
 		standard_timing_db[i].aspect = aspect;
-		standard_timing_db[i].refresh_rate = (v1 & ~(3 << 6)) + 60;
+        standard_timing_db[i].refresh_rate = (v1 & 0x3F) + 60;
 		standard_timing_db[i].supported = true;
-	}
-#endif
-
-	if (extensions == 1) {
-		EDID_DBG("Block-1: additional timing\n");
-		/* Block-1: additional timing */
-		for( i = 0; i < (edid_buf[128 + 4] & 0x1f); i++) {
-			index = edid_buf[128 + 5 + i] & 0x7f;
-			additional_timing_db[index-1].supported = true;
-			EDID_DBG("%s\n", additional_timing_db[index-1].descrption);
-			}
-		edid_check_hdmi_sink(hdmi, 1);
-	} else {
-		EDID_DBG("Block-2: additional timing\n");
-		for( i = 0; i < (edid_buf[384 + 4] & 0x1f); i++) {
-			index = edid_buf[384 + 5 + i] & 0x7f;
-			additional_timing_db[index-1].supported = true;
-			EDID_DBG("%s\n", additional_timing_db[index-1].descrption);
-			}
-		edid_check_hdmi_sink(hdmi, 3);
+        EDID_DBG("  Standard timing: %dx%d @ %d Hz\n", width, height, standard_timing_db[i].refresh_rate);
 	}
 
+    for (extension = 0; extension < extensions; extension++)
+    {
+        unsigned baseOffset = (extension + 1) * 0x80;
+        unsigned dtdStart = 0;
+        unsigned nativeFormats = 0;
+        unsigned dbcOffset;
+
+        EDID_DBG("Extension %d\n", extension +1);
+        if (edid_buf[baseOffset] != 0x02)
+        {
+            EDID_DBG("  Extension is not CEA EDID format. Skipping.\n");
+            continue;
+        }
+
+        if (edid_buf[baseOffset+1] < 0x03)
+        {
+            EDID_DBG("  CEA EDID Extension is below version 3. Skipping.\n");
+            continue;
+        }
+
+        dtdStart = edid_buf[baseOffset+2];
+
+        edid_info->under_scan  = edid_buf[baseOffset+3] & EDID_BIT(7);
+        edid_info->basic_audio = edid_buf[baseOffset+3] & EDID_BIT(6);
+        edid_info->ycbcr_4_4_4 = edid_buf[baseOffset+3] & EDID_BIT(5);
+        edid_info->ycbcr_4_2_2 = edid_buf[baseOffset+3] & EDID_BIT(4);
+
+        nativeFormats = edid_buf[baseOffset+3] & 0x04;
+        dbcOffset = 4;
+
+        while (dbcOffset < dtdStart)
+        {
+            unsigned blockType = edid_buf[baseOffset + dbcOffset] >> 5;
+            unsigned blockLen = edid_buf[baseOffset + dbcOffset] & 0x1f;
+            unsigned byte;
+
+            EDID_DBG("  Block Type: %d  Block Length: %d\n", blockType, blockLen);
+
+            // Check for an audio data block
+            if (blockType == AUDIO_D_BLOCK)
+            {
+                edid_info->basic_audio = true;
+                EDID_DBG("  CEA3 Audio Data Block found.\n");
+                dbcOffset += blockLen + 1;
+                continue;
+            }
+
+            // Check for a vendor data block
+            if (blockType == VENDOR_SPEC_D_BLOCK)
+            {
+                EDID_DBG("  CEA3 Vendor Block found.\n");
+                // This may be an HDMI vendor block, and if so, we need to parse it
+                if (edid_buf[baseOffset + dbcOffset + 1] == 0x03 && 
+                    edid_buf[baseOffset + dbcOffset + 2] == 0x0C && 
+                    edid_buf[baseOffset + dbcOffset + 3] == 0x00 )
+                {
+                    // We found the HDMI block
+                    EDID_DBG("  CEA3 HDMI Vendor Block found.\n");
+                    hdmi->edid_info.hdmi_sink = true;
+                }
+                dbcOffset += blockLen + 1;
+                continue;
+            }
+            if (blockType != VIDEO_D_BLOCK)
+            {
+                dbcOffset += blockLen + 1;
+                continue;
+            }
+
+            // The block will be an array of indexes
+            for (byte = 1; byte < blockLen; byte++)
+            {
+                index = edid_buf[baseOffset + dbcOffset + byte] & 0x7f;
+
+                if (index > 63)
+                {
+                    EDID_DBG("Invalid index in EDID Video block. Ignoring.\n");
+                }
+                else
+                {
+                    additional_timing_db[index-1].supported = true;
+                    EDID_DBG("%s\n", additional_timing_db[index-1].descrption);
+                }
+            }
+
+            dbcOffset += blockLen + 1;
+        }
+    }
+
+    // As a cheat, we're replacing the existing timings with our own "custom"
+    // definition of these bytes.
 	edid_buf[35] = 0;
 	edid_buf[36] = 0;
 	edid_buf[37] = 0;
@@ -546,27 +605,32 @@ u8 edid_simple_parsing(struct hdmi_info *hdmi)
 	    additional_timing_db[CEA_MODE_720X480P_60HZ_16_9].supported) {
 		EDID_DBG("decide to support 480P\n");
 		edid_buf[37] |= (1<<4);
+        hdmi->edid_info.resolutionSupported[RES_720x480] = true;
 	}
 
 	if (additional_timing_db[CEA_MODE_720X576P_50HZ_4_3].supported ||
 	    additional_timing_db[CEA_MODE_720X576P_50HZ_16_9].supported) {
 		EDID_DBG("decide to support 576P\n");
 		edid_buf[37] |= (1<<5);
+        hdmi->edid_info.resolutionSupported[RES_720x576] = true;
 	}
 
 	if (additional_timing_db[CEA_MODE_1280X720P_60HZ_16_9].supported) {
 		EDID_DBG("decide to support 720P\n");
 		edid_buf[37] |= (1<<6);
+        hdmi->edid_info.resolutionSupported[RES_1280x720] = true;
 	}
 
 	if (established_timing_db[ESTABLISHED_MODE_800X600_60HZ].supported) {
 		EDID_DBG("decide to support 800x600\n");
 		edid_buf[36] |= (1<<6);
+        hdmi->edid_info.resolutionSupported[RES_800x600] = true;
 	}
 
 	if (established_timing_db[ESTABLISHED_MODE_640X480_60HZ].supported) {
 		EDID_DBG("decide to support 640x480\n");
 		edid_buf[35] |= (1<<5);
+        hdmi->edid_info.resolutionSupported[RES_640x480] = true;
 	}
 	edid_fixup_compatibility_list(hdmi);
 
@@ -613,6 +677,57 @@ bool edid_check_sink_type(struct hdmi_info *hdmi)
         return hdmi->edid_info.hdmi_sink;
 }
 
+bool edid_check_audio_support(struct hdmi_info *hdmi)
+{
+    EDID_DBG("%s: ret=%d\n", __func__, hdmi->edid_info.basic_audio);
+    return hdmi->edid_info.basic_audio;
+}
+
+bool edid_get_best_resolution(struct hdmi_info *hdmi, int* width, int* height)
+{
+    int res;
+    for (res = RES_MAX_RESOLUTIONS; res > 0;)
+    {
+        if (hdmi->edid_info.resolutionSupported[--res] == true)
+        {
+            switch (res)
+            {
+            case RES_640x480:
+                *width = 640;
+                *height = 480;
+                return true;
+            case RES_720x480:
+                *width = 720;
+                *height = 480;
+                return true;
+            case RES_720x576:
+                *width = 720;
+                *height = 576;
+                return true;
+            case RES_800x600:
+                *width = 800;
+                *height = 600;
+                return true;
+            case RES_1280x720:
+                *width = 1280;
+                *height = 720;
+                return true;
+            default:
+                break;
+            }
+
+        }
+    }
+    return false;
+}
+
+bool edid_get_screen_size(struct hdmi_info *hdmi, unsigned int* width, unsigned int* height)
+{
+    *width = (unsigned int) hdmi->edid_info.screenWidth;
+    *height = (unsigned int) hdmi->edid_info.screenHeight;
+    return true;
+}
+
 int edid_dump_hex(u8 *src, int src_size, char *output, int output_size)
 {
         char line[80];
@@ -654,16 +769,9 @@ static ssize_t edid_buffered_read(struct file *filp, char __user *buf,
                 size_t count, loff_t *ppos)
 {
 	int n;
-	int extensions;
         struct hdmi_info *hdmi = (struct hdmi_info*)filp->private_data;
 
-	extensions = hdmi->edid_buf[0x7e] + 1;
-	edid_dump_video_modes(hdmi->edid_buf);// fixme: crashed
-	if (extensions == 1)
-		edid_dump_video_modes(hdmi->edid_buf + 128);
-	else
-		edid_dump_video_modes(hdmi->edid_buf + 384);
-	//edid_simple_parsing(hdmi); // FIXME: crashed...
+    edid_simple_parsing(hdmi);
 	n = edid_dump_hex(hdmi->edid_buf, (hdmi->edid_buf[0x7e] + 1) * 128,
 		hex_buff, 2048);
         return simple_read_from_buffer(buf, count, ppos, hex_buff, n);
@@ -692,4 +800,3 @@ int edid_debugfs_init(struct hdmi_info *hdmi)
 
         return 0;
 }
-

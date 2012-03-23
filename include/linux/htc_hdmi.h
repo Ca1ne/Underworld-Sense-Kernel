@@ -34,6 +34,9 @@ enum {
 #define HDMI_GET_EDID		_IOR(HDMI_IOCTL_MAGIC, 9, unsigned)
 #define HDMI_GET_DISPLAY_INFO	_IOR(HDMI_IOCTL_MAGIC, 10, unsigned)
 
+#define HDMI_GET_MIRRORING      _IOR(HDMI_IOCTL_MAGIC, 40, unsigned)
+#define HDMI_SET_MIRRORING      _IOR(HDMI_IOCTL_MAGIC, 41, unsigned)
+
 #define ASPECT(w, h)            (w << 8 | h)
 struct video_mode {
         unsigned short  width, height, refresh_rate, aspect;
@@ -51,6 +54,31 @@ struct display_info {
 	unsigned int	visible_height;	
 	unsigned int	resolution_width;	/* in pixel */
 	unsigned int	resolution_height;
+};
+
+enum MIRROR_ROTATION {
+    ROTATE_AUTO, 
+    ROTATE_0, 
+    ROTATE_90,
+    ROTATE_180,
+    ROTATE_270
+};
+
+
+enum MIRROR_SCALING {
+    SCALING_FIT_TO_SCREEN, 
+    SCALING_CENTER, 
+    SCALING_STRETCH
+};
+
+
+/* Gathered statistics for mirroring */
+struct mirror_settings {
+    enum MIRROR_ROTATION rotation;
+    enum MIRROR_SCALING scaling;
+    int overscanX;
+    int overscanY;
+    int audioOverHdmi;
 };
 
 #endif

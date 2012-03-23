@@ -43,6 +43,10 @@ extern void start_drawing_late_resume(struct early_suspend *h);
 static void msmfb_resume_handler(struct early_suspend *h);
 static void msmfb_resume(struct work_struct *work);
 
+#ifdef CONFIG_MSM_HDMI
+void hdmi_reportBlit(struct fb_info *info);
+#endif
+
 #define MSMFB_DEBUG 1
 #ifdef CONFIG_FB_MSM_LOGO
 #define INIT_IMAGE_FILE "/logo.rle"
@@ -434,6 +438,13 @@ restart:
 				      HRTIMER_MODE_REL);
 		}
 	}
+  
+	/* We did the DMA, now blit the data to the other display */
+#ifdef CONFIG_MSM_HDMI
+    hdmi_reportBlit(info);
+#endif
+
+    return;
 }
 
 static void msmfb_update(struct fb_info *info, uint32_t left, uint32_t top,

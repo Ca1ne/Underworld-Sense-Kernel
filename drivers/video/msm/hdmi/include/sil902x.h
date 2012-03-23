@@ -361,8 +361,14 @@ int edid_dump_hex(u8 *src, int src_size, char *output, int output_size);
 bool edid_is_video_mode_supported(struct video_mode *vmode);
 int edid_debugfs_init(struct hdmi_info *hdmi);
 bool edid_check_sink_type(struct hdmi_info *hdmi);
+bool edid_check_audio_support(struct hdmi_info *hdmi);
+bool edid_get_best_resolution(struct hdmi_info *hdmi, int* width, int* height);
+bool edid_get_screen_size(struct hdmi_info *hdmi, unsigned int* width, unsigned int* height);
 int HotPlugServiceLoop(struct hdmi_info *hdmi);
 int tpi_prepare(struct hdmi_info *hdmi);
+
+void mirroring_cable_conn(struct hdmi_info *hdmi);
+void mirroring_cable_disconn(struct hdmi_info *hdmi);
 
 //bool InitVideo(struct hdmi_info *hdmi, u8 Mode, u8 TclkSel, bool Init);
 void avc_set_basic_audio(struct hdmi_info *hdmi);

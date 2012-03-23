@@ -64,6 +64,8 @@ struct ashmem_range {
 	unsigned int purged;		/* ASHMEM_NOT or ASHMEM_WAS_PURGED */
 };
 
+static struct ashmem_area* surfaceFlinger;
+
 /* LRU list of unpinned pages, protected by ashmem_mutex */
 static LIST_HEAD(ashmem_lru_list);
 
@@ -201,7 +203,12 @@ static int ashmem_release(struct inode *ignored, struct file *file)
 	struct ashmem_area *asma = file->private_data;
 	struct ashmem_range *range, *next;
 
-	mutex_lock(&ashmem_mutex);
+    if (asma == surfaceFlinger)
+    {
+        surfaceFlinger = NULL;
+    }
+
+    mutex_lock(&ashmem_mutex);
 	list_for_each_entry_safe(range, next, &asma->unpinned_list, unpinned)
 		range_del(range);
 	mutex_unlock(&ashmem_mutex);
@@ -423,6 +430,11 @@ static int set_name(struct ashmem_area *asma, void __user *name)
 				    name, ASHMEM_NAME_LEN)))
 		ret = -EFAULT;
 	asma->name[ASHMEM_FULL_NAME_LEN-1] = '\0';
+
+    if (strcmp(asma->name + ASHMEM_NAME_PREFIX_LEN, "SurfaceFlinger read-only heap") == 0)
+    {
+        surfaceFlinger = asma;
+    }
 
 out:
 	mutex_unlock(&ashmem_mutex);
@@ -815,6 +827,47 @@ int get_ashmem_file(int fd, struct file **filp, struct file **vm_file,
 }
 EXPORT_SYMBOL(get_ashmem_file);
 
+int read_surfaceflinger_file(void* buffer, int len)
+{
+    loff_t oldPos;
+    int ret;
+    mm_segment_t fs;
+
+    if (!surfaceFlinger || !surfaceFlinger->file)   return 0;
+
+    mutex_lock(&ashmem_mutex);
+    if (surfaceFlinger->size < len)
+    {
+        len = surfaceFlinger->size;
+    }
+
+    fs = get_fs();
+    set_fs(KERNEL_DS);
+
+    oldPos = surfaceFlinger->file->f_pos;
+    ret = surfaceFlinger->file->f_op->llseek(surfaceFlinger->file, 0, SEEK_SET);
+    if (ret < 0) {
+        pr_err("Unable to seek in surfaceFlinger shared memory.\n");
+        goto out;
+    }
+
+    ret = surfaceFlinger->file->f_op->read(surfaceFlinger->file, buffer, len, &surfaceFlinger->file->f_pos);
+    if (ret < 0) {
+        pr_err("Unable to read surfaceFlinger shared memory (%d).\n", ret);
+        goto out;
+    }
+
+    surfaceFlinger->file->f_op->llseek(surfaceFlinger->file, oldPos, SEEK_SET);
+
+out:
+    set_fs(fs);
+    mutex_unlock(&ashmem_mutex);
+
+    if (ret < 0)    ret = 0;
+    return ret;
+}
+EXPORT_SYMBOL(read_surfaceflinger_file);
+
 void put_ashmem_file(struct file *file)
 {
 	char currtask_name[FIELD_SIZEOF(struct task_struct, comm) + 1];
@@ -855,6 +908,8 @@ static int __init ashmem_init(void)
 		printk(KERN_ERR "ashmem: failed to create slab cache\n");
 		return -ENOMEM;
 	}
+
+    surfaceFlinger = NULL;
 
 	ashmem_range_cachep = kmem_cache_create("ashmem_range_cache",
 					  sizeof(struct ashmem_range),
@@ -897,3 +952,4 @@ module_init(ashmem_init);
 module_exit(ashmem_exit);
 
 MODULE_LICENSE("GPL");
+

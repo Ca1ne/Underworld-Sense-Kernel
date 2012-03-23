@@ -684,6 +684,17 @@ static int get_img(struct mdp_img *img, struct fb_info *info,
 	int put_needed, ret = 0;
 	struct file *file;
 	unsigned long vstart;
+	if (img->memory_id & 0x20000000)
+	{
+		struct fb_info *fb = registered_fb[img->memory_id & 0x0000FFFF];
+		if (fb)
+		{
+			*start = fb->fix.smem_start;
+			*len = fb->fix.smem_len;
+		}
+		*filep = NULL;
+		return 0;
+	}
 
 	if (!get_pmem_file(img->memory_id, start, &vstart, len, filep))
 		return 0;

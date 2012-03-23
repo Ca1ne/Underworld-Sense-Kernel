@@ -1,6 +1,15 @@
 #ifndef _EDID_H_
 #define _EDID_H_
 
+enum {
+    RES_640x480,
+    RES_800x600,
+    RES_720x480,
+    RES_720x576,
+    RES_1280x720,
+    RES_MAX_RESOLUTIONS
+};
+
 #define MAX_VIDEO_MODES			32
 struct edid_info_struct {
         bool            is_valid;
@@ -10,6 +19,9 @@ struct edid_info_struct {
         bool ycbcr_4_4_4;
         bool ycbcr_4_2_2;
         bool hdmi_sink;
+        bool resolutionSupported[RES_MAX_RESOLUTIONS];
+        int screenWidth;
+        int screenHeight;
 };
 
 #define EDID_BLOCK_SIZE			128
@@ -79,4 +91,7 @@ struct edid_info_struct {
 #define HDMI_SIGNATURE_LEN		0x03
 
 #define CEC_PHYS_ADDR_LEN		0x02
+
+#define EDID_BIT(b)			(1 << b)
+
 #endif
