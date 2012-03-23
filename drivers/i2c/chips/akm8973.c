@@ -187,9 +187,9 @@ static int AKECS_GetData(void)
 	char buffer[RBUFF_SIZE + 1];
 	int ret;
 
-	memset(buffer, 0, RBUFF_SIZE);
+	memset(buffer, 0, RBUFF_SIZE+1);
 	buffer[0] = AKECS_REG_ST;
-	ret = AKI2C_RxData(buffer, RBUFF_SIZE);
+	ret = AKI2C_RxData(buffer, RBUFF_SIZE+1);
 	if (ret < 0)
 		return ret;
 
@@ -902,3 +902,4 @@ module_exit(akm8973_exit);
 MODULE_AUTHOR("viral wang <viral_wang@htc.com>");
 MODULE_DESCRIPTION("AKM8973 compass driver");
 MODULE_LICENSE("GPL");
+
