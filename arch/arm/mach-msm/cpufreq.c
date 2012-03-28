@@ -32,7 +32,7 @@
 /* Make sure the kernel is not overclocked on boot to avoid potential freezing/boot loops
  * for people with less capable hardware. */
 #define CPUFREQ_MAX 998400
-#define CPUFREQ_MIN 245760
+#define CPUFREQ_MIN 245000
 
 #ifdef CONFIG_SMP
 struct cpufreq_work_struct {
