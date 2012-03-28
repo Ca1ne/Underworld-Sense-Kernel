@@ -17,6 +17,9 @@
 
 #include <mach/board.h>
 
+#define CONFIG_CPU_FREQ_VDD_LEVELS_MIN	800
+#define CONFIG_CPU_FREQ_VDD_LEVELS_MAX	1350
+
 #define MSM_SMI_BASE		0x02B00000
 #define MSM_SMI_SIZE		0x01500000
 

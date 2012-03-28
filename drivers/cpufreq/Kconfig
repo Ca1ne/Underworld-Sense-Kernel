@@ -235,6 +235,22 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
+config CPU_FREQ_VDD_LEVELS
+	bool "CPU Vdd levels sysfs interface"
+	depends on CPU_FREQ_STAT
+	depends on ARCH_QSD8X50
+	default n
+	help
+	  CPU Vdd levels sysfs interface
+
+config CPU_FREQ_VDD_LEVELS_MIN
+	int "Min VDD Level"
+	default 1000
+
+config CPU_FREQ_VDD_LEVELS_MAX
+	int "Max VDD Level"
+	default 1300
+
 config CPU_FREQ_GOV_SMARTASS2
 	tristate "'smartassV2' cpufreq governor"
 	depends on CPU_FREQ

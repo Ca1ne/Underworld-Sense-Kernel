@@ -29,6 +29,11 @@
 
 #include "acpuclock.h"
 
+/* Make sure the kernel is not overclocked on boot to avoid potential freezing/boot loops
+ * for people with less capable hardware. */
+#define CPUFREQ_MAX 998400
+#define CPUFREQ_MIN 245760
+
 #ifdef CONFIG_SMP
 struct cpufreq_work_struct {
 	struct work_struct work;
@@ -187,6 +192,7 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 
 #ifndef CONFIG_ARCH_MSM8X60
 	policy->cur = acpuclk_get_rate();
+	
 #else
 	cur_freq = acpuclk_get_rate(policy->cpu);
 	if (cpufreq_frequency_table_target(policy, table, cur_freq,
@@ -206,10 +212,10 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 				policy->cpu, cur_freq, table[index].frequency);
 		cur_freq = table[index].frequency;
 	}
-
 	policy->cur = cur_freq;
 #endif
-
+	policy->max = CPUFREQ_MAX;
+	policy->min = CPUFREQ_MIN;
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
 #ifdef CONFIG_SMP
