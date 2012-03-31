@@ -74,7 +74,7 @@ choice
 		bool "CFQ" if IOSCHED_CFQ=y
 
 	config DEFAULT_SIO
-		bool "sio" if IOSCHED_SIO=y
+		bool "SIO" if IOSCHED_SIO=y
 
 	config DEFAULT_VR
 		bool "vr" if IOSCHED_VR=y

@@ -1207,7 +1207,7 @@ static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
 	.camera_flash		= flashlight_control,
 	.num_flash_levels	= FLASHLIGHT_NUM,
 	.low_temp_limit		= 10,
-	.low_cap_limit		= 15,
+	.low_cap_limit		= 10,
 };
 /*2nd source for 2nd camera*/
 static struct msm_camera_sensor_info msm_camera_sensor_s5k6aafx_data = {
