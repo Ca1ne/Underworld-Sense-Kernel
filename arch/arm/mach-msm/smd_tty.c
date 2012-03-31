@@ -130,11 +130,6 @@ static int smd_tty_open(struct tty_struct *tty, struct file *f)
 		/* MASD requested OMA_DM AT-channel */
 		name = "SMD_DATA3";
 #endif
-#ifdef CONFIG_BUILD_CIQ
-	} else if (n == 26) {
-		/* CIQ Master/Slaver Bridge */
-		name = "SMD_DATA20";
-#endif
 	} else {
 		return -ENODEV;
 	}
@@ -286,10 +281,6 @@ static int __init smd_tty_init(void)
 	/* MASD requested OMA_DM AT-channel */
 	tty_register_device(smd_tty_driver, 19, 0);
 	INIT_WORK(&smd_tty[19].tty_work, smd_tty_work_func);
-#endif
-#ifdef CONFIG_BUILD_CIQ
-	tty_register_device(smd_tty_driver, 26, 0);
-	INIT_WORK(&smd_tty[26].tty_work, smd_tty_work_func);
 #endif
 
 	return 0;

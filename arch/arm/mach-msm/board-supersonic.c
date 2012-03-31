@@ -561,41 +561,6 @@ static struct android_pmem_platform_data android_pmem_venc_pdata = {
 	.cached		= 1,
 };
 
-
-#ifdef CONFIG_BUILD_CIQ
-static struct android_pmem_platform_data android_pmem_ciq_pdata = {
-	.name = "pmem_ciq",
-	.start = MSM_PMEM_CIQ_BASE,
-	.size = MSM_PMEM_CIQ_SIZE,
-	.no_allocator = 0,
-	.cached = 0,
-};
-
-static struct android_pmem_platform_data android_pmem_ciq1_pdata = {
-	.name = "pmem_ciq1",
-	.start = MSM_PMEM_CIQ1_BASE,
-	.size = MSM_PMEM_CIQ1_SIZE,
-	.no_allocator = 0,
-	.cached = 0,
-};
-
-static struct android_pmem_platform_data android_pmem_ciq2_pdata = {
-	.name = "pmem_ciq2",
-	.start = MSM_PMEM_CIQ2_BASE,
-	.size = MSM_PMEM_CIQ2_SIZE,
-	.no_allocator = 0,
-	.cached = 0,
-};
-
-static struct android_pmem_platform_data android_pmem_ciq3_pdata = {
-	.name = "pmem_ciq3",
-	.start = MSM_PMEM_CIQ3_BASE,
-	.size = MSM_PMEM_CIQ3_SIZE,
-	.no_allocator = 0,
-	.cached = 0,
-};
-#endif
-
 static struct platform_device android_pmem_mdp_device = {
 	.name		= "android_pmem",
 	.id		= 0,
@@ -619,34 +584,6 @@ static struct platform_device android_pmem_venc_device = {
 		.platform_data = &android_pmem_venc_pdata,
 	},
 };
-
-#ifdef CONFIG_BUILD_CIQ
-static struct platform_device android_pmem_ciq_device = {
-	.name = "android_pmem",
-	.id = 7,
-	.dev = { .platform_data = &android_pmem_ciq_pdata },
-};
-
-static struct platform_device android_pmem_ciq1_device = {
-	.name = "android_pmem",
-	.id = 8,
-	.dev = { .platform_data = &android_pmem_ciq1_pdata },
-};
-
-static struct platform_device android_pmem_ciq2_device = {
-	.name = "android_pmem",
-	.id = 9,
-	.dev = { .platform_data = &android_pmem_ciq2_pdata },
-};
-
-static struct platform_device android_pmem_ciq3_device = {
-	.name = "android_pmem",
-	.id = 10,
-	.dev = { .platform_data = &android_pmem_ciq3_pdata },
-};
-#endif
-
-
 
 static struct resource ram_console_resources[] = {
 	{
@@ -1411,12 +1348,6 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_adsp_device,
 #ifdef CONFIG_720P_CAMERA
 	&android_pmem_venc_device,
-#endif
-#ifdef CONFIG_BUILD_CIQ
-	&android_pmem_ciq_device,
-	&android_pmem_ciq1_device,
-	&android_pmem_ciq2_device,
-	&android_pmem_ciq3_device,
 #endif
 	&msm_camera_sensor_s5k3h1,
 	&msm_camera_sensor_ov8810,

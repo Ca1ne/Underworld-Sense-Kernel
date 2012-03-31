@@ -47,10 +47,6 @@ static const char *rpc_versions[] = {
 #define TIMEREMOTE_PROCEEDURE_SET_JULIAN	6
 #define TIMEREMOTE_PROCEEDURE_GET_JULIAN	7
 
-#ifdef CONFIG_BUILD_CIQ
-#define TIMEREMOTE_PROCEEDURE_GET_MILLISECOND_TICK	100
-#endif
-
 struct rpc_time_julian {
 	uint32_t year;
 	uint32_t month;
@@ -191,53 +187,15 @@ msmrtc_virtual_alarm_set(struct device *dev, struct rtc_wkalrm *a)
 	return 0;
 }
 
-#ifdef CONFIG_BUILD_CIQ
-static int
-msmrtc_timeremote_read_ticks(struct device *dev, struct timespec *ticks)
-{
-	int rc;
-	int64_t get_ticks;
-
-	struct timeremote_get_xtal_ticks_req {
-		struct rpc_request_hdr hdr;
-		uint32_t julian_time_not_null;
-	} req;
-
-	struct timeremote_get_xtal_ticks_rep {
-		struct rpc_reply_hdr hdr;
-		uint32_t sync_ticks;
-	} rep;
-
-	req.julian_time_not_null = cpu_to_be32(1);
-
-	rc = msm_rpc_call_reply(ep, TIMEREMOTE_PROCEEDURE_GET_MILLISECOND_TICK,
-				&req, sizeof(req),
-				&rep, sizeof(rep),
-				5 * HZ);
-	if (rc < 0) {
-		pr_err("%s: msm_rpc_call_reply fail (%d)\n", __func__, rc);
-		return rc;
-	}
-
-	get_ticks = be32_to_cpu(rep.sync_ticks);
-	*ticks = ns_to_timespec(get_ticks*NSEC_PER_MSEC);
-
 #if RTC_DEBUG
 	printk(KERN_DEBUG "%s ticks to ns: %lld\n",
 			__func__, timespec_to_ns(ticks));
-#endif
-
-	return 0;
-}
 #endif
 
 static struct rtc_class_ops msm_rtc_ops = {
 	.read_time	= msmrtc_timeremote_read_time,
 	.set_time	= msmrtc_timeremote_set_time,
 	.set_alarm	= msmrtc_virtual_alarm_set,
-#ifdef CONFIG_BUILD_CIQ
-	.read_ticks	= msmrtc_timeremote_read_ticks,
-#endif
 };
 
 static void

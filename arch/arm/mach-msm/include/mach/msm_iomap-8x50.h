@@ -143,8 +143,4 @@
 #define MSM_TCSR_PHYS  0xA8700000
 #define MSM_TCSR_SIZE  SZ_4K
 
-#ifdef CONFIG_BUILD_CIQ
-#define SMD_CIQ_BASE		0xFC11C
-#endif
-
 #endif
