@@ -506,9 +506,9 @@ static int s5k6aafx_set_front_camera_mode(enum frontcam_t frontcam_value)
 		
 		break;
 	case CAMERA_REVERSE:
-		/*reverse mode
+		/*reverse mode*/
 			s5k6aafx_i2c_write(s5k6aafx_client->addr, 0x02D4, 0x0003);
-			s5k6aafx_i2c_write(s5k6aafx_client->addr, 0x02D6, 0x0003);*/
+			s5k6aafx_i2c_write(s5k6aafx_client->addr, 0x02D6, 0x0003);
 		
 		break;
 

@@ -752,11 +752,11 @@ static int ov9665_set_front_camera_mode(enum frontcam_t frontcam_value)
 			0x33, 0xc8, BYTE_LEN);
 		break;
 	case CAMERA_REVERSE:
-		/*reverse mode
+		/*reverse mode*/
 		ov9665_i2c_write(ov9665_client->addr,
 			0x04, 0x28, BYTE_LEN);
 		ov9665_i2c_write(ov9665_client->addr,
-			0x33, 0xc0, BYTE_LEN);*/
+			0x33, 0xc0, BYTE_LEN);
 		break;
 	default:
 		break;

@@ -245,11 +245,11 @@ config CPU_FREQ_VDD_LEVELS
 
 config CPU_FREQ_VDD_LEVELS_MIN
 	int "Min VDD Level"
-	default 1000
+	default 800
 
 config CPU_FREQ_VDD_LEVELS_MAX
 	int "Max VDD Level"
-	default 1300
+	default 1350
 
 config CPU_FREQ_GOV_SMARTASS2
 	tristate "'smartassV2' cpufreq governor"
