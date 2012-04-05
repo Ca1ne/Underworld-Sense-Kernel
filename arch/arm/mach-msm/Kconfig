@@ -29,6 +29,7 @@ config ARCH_QSD8X50
 	select ARCH_MSM_SCORPION
 	select CPU_V7
 	select VERIFY_PERMISSION_FAULT
+
 config ARCH_MSM8X60
 	bool "MSM8X60"
 	select ARCH_MSM_SCORPIONMP
@@ -751,6 +752,12 @@ config HTC_BATTCHG_SMEM
 	depends on HTC_BATTCHG
 	default n
 	bool "Read Battery Info via SMEM"
+
+config HTC_BATTCHG_SBC
+	default n
+	bool "Superior Battery Charging mod"
+	help
+	  Superior Battery Charging mod
 
 config HTC_PWRSINK
 	depends on MSM_SMD
