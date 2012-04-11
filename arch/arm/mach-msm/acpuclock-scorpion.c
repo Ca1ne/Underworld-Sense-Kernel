@@ -71,7 +71,7 @@ struct clkctl_acpu_speed {
 
 /* core sources */
 #define SRC_RAW		0 /* clock from SPSS_CLK_CNTL */
-#define SRC_SCPLL	1 /* output of scpll 128-1152 MHZ */
+#define SRC_SCPLL	1 /* output of scpll 128-1228 MHZ */
 #define SRC_AXI		2 /* 128 MHz */
 #define SRC_PLL1	3 /* 768 MHz */
 
@@ -100,7 +100,6 @@ struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 1075200, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1C, 0, 1300, 128000 },
 	{ 1113600, CCTL(CLK_TCXO, 1),  		SRC_SCPLL, 0x1D, 0, 1325, 128000 },
 	{ 1152000, CCTL(CLK_TCXO, 1), 	 	SRC_SCPLL, 0x1E, 0, 1350, 128000 },
-	{ 1152000, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1E, 0, 1350, 128000 },
 	{ 1190400, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1F, 0, 1350, 128000 },
 	{ 1228800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x20, 0, 1400, 128000 },
 	{ 0 },
@@ -129,21 +128,20 @@ static void __init acpuclk_init_cpufreq_table(void)
 		freq_table[i].index = i;
 		freq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 
-		/* Skip speeds using the global pll */
-		if (acpu_freq_tbl[i].acpu_khz == 256000 ||
-				acpu_freq_tbl[i].acpu_khz == 19200)
+		/* Define Speeds to skip */
+		if (acpu_freq_tbl[i].acpu_khz == 19200 ||
+				acpu_freq_tbl[i].acpu_khz == 256000)
 			continue;
 
 		vdd = acpu_freq_tbl[i].vdd;
 		/* Allow mpll and the first scpll speeds */
 		if (acpu_freq_tbl[i].acpu_khz == acpu_mpll->acpu_khz ||
-				acpu_freq_tbl[i].acpu_khz == 384000) {
+				acpu_freq_tbl[i].acpu_khz == 245000) {
 			freq_table[i].frequency = acpu_freq_tbl[i].acpu_khz;
 			continue;
 		}
 
-		/* Take the fastest speed available at the specified VDD level */
-		/*if (vdd != acpu_freq_tbl[i + 1].vdd)*/
+		/* Add freq to the table */
 			freq_table[i].frequency = acpu_freq_tbl[i].acpu_khz;
 	}
 
