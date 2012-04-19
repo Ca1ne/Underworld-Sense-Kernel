@@ -36,6 +36,8 @@
 #include <linux/rtc.h>
 DEFINE_MUTEX(hlist_mut);
 
+DEFINE_MUTEX(ctrl_cmd_lock);
+
 #define MSM_MAX_CAMERA_SENSORS 5
 
 #define ERR_USER_COPY(to) pr_err("[CAM]%s(%d): copy %s user\n", \
@@ -131,6 +133,7 @@ static void msm_enqueue(struct msm_device_queue *queue,
 		qcmd = list_first_entry(&__q->list,			\
 				struct msm_queue_cmd, member);		\
 				if (qcmd) {                         \
+				if (!list_empty_careful(&qcmd->member))  \
 					list_del_init(&qcmd->member);	\
 				}                                   \
 	}												\
@@ -148,6 +151,7 @@ static void msm_enqueue(struct msm_device_queue *queue,
 	while (!list_empty(&__q->list)) {				\
 		qcmd = list_first_entry(&__q->list,			\
 			struct msm_queue_cmd, member);			\
+		if (!list_empty_careful(&qcmd->member))      \
 		list_del_init(&qcmd->member);				\
 		free_qcmd(qcmd);							\
 	};												\
@@ -591,21 +595,27 @@ static struct msm_queue_cmd *__msm_control(struct msm_sync *sync,
 		int timeout)
 {
 	int rc;
-
+	int loop = 0;
 	msm_enqueue(&sync->event_q, &qcmd->list_config);
 
 	if (!queue)
 		return NULL;
 
 	/* wait for config status */
-	rc = wait_event_interruptible_timeout(
+wait_event:
+	rc = wait_event_timeout(
 			queue->wait,
 			!list_empty_careful(&queue->list),
 			timeout);
 	if (list_empty_careful(&queue->list)) {
 		if (!rc)
 			rc = -ETIMEDOUT;
-		if (rc < 0) {
+		if (rc == -512 && loop < 100) {
+			loop++;
+			msleep(5);
+			pr_info("[CAM]%s: goto wait_event loop %d\n", __func__, loop);
+			goto wait_event;
+		} else if (rc < 0) {
 			pr_err("[CAM]%s: wait_event error %d\n", __func__, rc);
 			/* qcmd may be still on the event_q, in which case we
 			 * need to remove it.  Alternatively, qcmd may have
@@ -1991,7 +2001,9 @@ static long msm_ioctl_control(struct file *filep, unsigned int cmd,
 	case MSM_CAM_IOCTL_CTRL_COMMAND:
 		/* Coming from control thread, may need to wait for
 		 * command status */
+		mutex_lock(&ctrl_cmd_lock);
 		rc = msm_control(ctrl_pmsm, 1, argp);
+		mutex_unlock(&ctrl_cmd_lock);
 		break;
 	case MSM_CAM_IOCTL_CTRL_COMMAND_2:
 		/* Sends a message, returns immediately */

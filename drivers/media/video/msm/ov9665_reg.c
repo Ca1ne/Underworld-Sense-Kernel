@@ -194,7 +194,7 @@ static const struct ov9665_i2c_reg_conf const register_init_tbl[] = {
 #if 1
 	/*mirror and flip*/
 	{0x04, 0xa8, BYTE_LEN, 1},
-	{0x33, 0xc8, BYTE_LEN, 1}
+	{0x33, 0xc0, BYTE_LEN, 1}
 #else
 	/*reverse mode*/
 	{0x04, 0x28, BYTE_LEN, 1},
