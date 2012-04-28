@@ -17,6 +17,9 @@
 #include <linux/gpio.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
+
 #include <mach/msm_qdsp6_audio.h>
 #include <mach/htc_acoustic_qsd.h>
 #include <mach/tpa6130.h>
@@ -33,12 +36,37 @@
 #define D(fmt, args...) do {} while (0)
 #endif
 
+static int aboost;
+
 static struct mutex mic_lock;
 static struct mutex bt_sco_lock;
 static struct mutex hdmi_i2s_lock;
 static int headset_status = 0;
 
-static struct q6_hw_info q6_audio_hw[Q6_HW_COUNT] = {
+static ssize_t aboost_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", aboost);
+}
+
+static ssize_t aboost_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	sscanf(buf, "%du", &aboost);
+	return count;
+}
+
+static struct kobj_attribute aboost_attribute =
+		__ATTR(aboost, 0666, aboost_show, aboost_store);
+
+static struct attribute *attrs[] = {
+	&aboost_attribute.attr,
+	NULL,
+};
+
+static struct attribute_group attr_group = {
+	.attrs = attrs,
+};
+
+static struct q6_hw_info q6_audio_hw_aboost[Q6_HW_COUNT] = {
 	[Q6_HW_HANDSET] = {
 		.min_gain = -1500,
 		.max_gain = 1199,
@@ -58,6 +86,33 @@ static struct q6_hw_info q6_audio_hw[Q6_HW_COUNT] = {
 	[Q6_HW_BT_SCO] = {
 		.min_gain = -1600,
 		.max_gain = 400,
+	},
+	[Q6_HW_BT_A2DP] = {
+		.min_gain = -2000,
+		.max_gain = 0,
+	},
+};
+
+static struct q6_hw_info q6_audio_hw_noaboost[Q6_HW_COUNT] = {
+	[Q6_HW_HANDSET] = {
+		.min_gain = -2000,
+		.max_gain = 0,
+	},
+	[Q6_HW_HEADSET] = {
+		.min_gain = -2000,
+		.max_gain = 0,
+	},
+	[Q6_HW_SPEAKER] = {
+		.min_gain = -1500,
+		.max_gain = 0,
+	},
+	[Q6_HW_TTY] = {
+		.min_gain = -2000,
+		.max_gain = 0,
+	},
+	[Q6_HW_BT_SCO] = {
+		.min_gain = -2000,
+		.max_gain = 0,
 	},
 	[Q6_HW_BT_A2DP] = {
 		.min_gain = -2000,
@@ -285,7 +340,12 @@ int supersonic_get_rx_vol(uint8_t hw, int level)
 	struct q6_hw_info *info;
 	int vol;
 
-	info = &q6_audio_hw[hw];
+	if (aboost == 0) {
+		info = &q6_audio_hw_noaboost[hw];
+	}
+	else {
+		info = &q6_audio_hw_aboost[hw];
+	}
 	vol = info->min_gain + ((info->max_gain - info->min_gain) * level) / 100;
 	D("%s %d\n", __func__, vol);
 	return vol;
@@ -307,6 +367,27 @@ static struct q6audio_analog_ops ops = {
 	.get_rx_vol = supersonic_get_rx_vol,
 };
 
+static struct kobject *aboost_kobj;
+
+int aboost_init(void)
+{
+	int retval;
+
+	aboost_kobj = kobject_create_and_add("audio_boost", kernel_kobj);
+		if (!aboost_kobj) {
+			return -ENOMEM;
+		}
+	retval = sysfs_create_group(aboost_kobj, &attr_group);
+	if (retval)
+		kobject_put(aboost_kobj);
+	return retval;
+}
+
+void aboost_exit(void)
+{
+	kobject_put(aboost_kobj);
+}
+
 void __init supersonic_audio_init(void)
 {
 	mutex_init(&mic_lock);
@@ -316,5 +397,8 @@ void __init supersonic_audio_init(void)
 	q6audio_register_analog_ops(&ops);
 #endif
 	acoustic_register_ops(&acoustic);
+	aboost = 0;
 }
 
+module_init(aboost_init);
+module_exit(aboost_exit);
