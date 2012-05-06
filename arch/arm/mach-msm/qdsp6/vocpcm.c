@@ -1,4 +1,4 @@
-/* 
+/*
  * A call recording/answering module for msm72xx devices 
  * which do not have a vocpcm driver built-in.
  * Should be put into arch/arm/mach-msm/qdsp5.
@@ -638,7 +638,7 @@ static int vocpcm_open(struct inode *inode, struct file *file)
 
 	mutex_lock(&the_voc.lock);
 	if (the_voc.task == NULL) {
-		if (the_voc.ept == NULL) 
+		if (the_voc.ept == NULL)
 			the_voc.ept = msm_rpc_connect_compatible(RPC_SND_PROG, RPC_SND_VERS,
 					MSM_RPC_UNINTERRUPTIBLE | MSM_RPC_ENABLE_RECEIVE);
 		if (IS_ERR(the_voc.ept)) {
@@ -782,7 +782,7 @@ static int __init vocpcm_init(void)
 	return rc;
 }
 
-static void shut_voc(struct voc_ctxt *ctx) 
+static void shut_voc(struct voc_ctxt *ctx)
 {
 	mutex_lock(&ctx->lock);
 
@@ -810,5 +810,4 @@ module_exit(vocpcm_exit);
 
 MODULE_DESCRIPTION("Incall recording pcm driver");
 MODULE_LICENSE("GPL v2");
-
 

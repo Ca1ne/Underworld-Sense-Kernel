@@ -394,7 +394,6 @@ static int audio_out_open(struct audio_client *ac, uint32_t bufsz,
 	TRACE("open out %p\n", ac);
 	return audio_ioctl(ac, &rpc, sizeof(rpc));
 }
-
 #if 0
 static int audio_in_open(struct audio_client *ac, uint32_t bufsz,
 			 uint32_t rate, uint32_t channels)
@@ -420,7 +419,7 @@ static int audio_in_open(struct audio_client *ac, uint32_t bufsz,
 }
 #else
 static int audio_in_open(struct audio_client *ac, uint32_t bufsz,
-			uint32_t flags, uint32_t rate, uint32_t channels)
+	uint32_t flags, uint32_t rate, uint32_t channels)
 {
 	struct adsp_open_command rpc;
 
@@ -1607,9 +1606,9 @@ static void adie_rx_path_enable(uint32_t acdb_id)
 	adie_set_path_freq_plan(adie, ADIE_PATH_RX, 48000);
 
 	adie_proceed_to_stage(adie, ADIE_PATH_RX,
-			ADIE_STAGE_DIGITAL_READY);
+		ADIE_STAGE_DIGITAL_READY);
 	adie_proceed_to_stage(adie, ADIE_PATH_RX,
-			ADIE_STAGE_DIGITAL_ANALOG_READY);
+		ADIE_STAGE_DIGITAL_ANALOG_READY);
 }
 
 static void q6_rx_path_enable(int reconf, uint32_t acdb_id)
@@ -1618,7 +1617,7 @@ static void q6_rx_path_enable(int reconf, uint32_t acdb_id)
 	if (!reconf)
 		qdsp6_devchg_notify(ac_control, ADSP_AUDIO_RX_DEVICE, audio_rx_device_id);
 	qdsp6_standby(ac_control);
-	
+	qdsp6_start(ac_control);
 }
 
 struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
@@ -1682,7 +1681,6 @@ struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
 			audio_rx_analog_enable(1);
 		}
 	}
-
 #else
 	if (ac->flags & AUDIO_FLAG_WRITE) {
 		audio_rx_path_refcount++;
@@ -1725,7 +1723,7 @@ struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
 	}
 #endif
 	mutex_unlock(&audio_path_lock);
-	
+
 	for (retry = 5;;retry--) {
 		rc = audio_command(ac, ADSP_AUDIO_IOCTL_CMD_SESSION_START);
 		if (rc == 0)
@@ -1953,8 +1951,8 @@ int q6audio_qcelp_close(struct audio_client *ac)
 }
 
 static int audio_amrnb_open(struct audio_client *ac, uint32_t bufsz,
-					uint32_t enc_mode, uint32_t flags,
-					uint32_t dtx_enable)
+				uint32_t enc_mode, uint32_t flags,
+				uint32_t dtx_enable)
 {
 	struct adsp_open_command rpc;
 

@@ -28,16 +28,16 @@
 #include <mach/msm_qdsp6_audio.h>
 
 #define AUDIO_SET_INCALL _IOW(AUDIO_IOCTL_MAGIC, 19, struct msm_voicerec_mode) 
-#define AUDIO_FLAG_INCALL_MIXED       2 
+#define AUDIO_FLAG_INCALL_MIXED       2
 #define AUDIO_GET_DEV_DRV_VER   _IOR(AUDIO_IOCTL_MAGIC, 56, unsigned) 
 #define DEV_DRV_VER             (8250 << 16 | 1) 
 
-struct pcm { 
-	struct audio_client *ac; 
-	uint32_t sample_rate; 
-	uint32_t channel_count; 
+struct pcm {
+	struct audio_client *ac;
+	uint32_t sample_rate;
+	uint32_t channel_count;
 	uint32_t buffer_size;
-	uint32_t rec_mode; 
+	uint32_t rec_mode;
 };
 
 #define BUFSZ (256)
@@ -52,11 +52,11 @@ static long q6_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case AUDIO_SET_VOLUME:
 		break;
-	case AUDIO_GET_DEV_DRV_VER: { 
-		unsigned int vers = DEV_DRV_VER; 
-		if (copy_to_user((void *) arg, &vers, sizeof(vers))) 
+			case AUDIO_GET_DEV_DRV_VER: { 
+				unsigned int vers = DEV_DRV_VER; 
+				if (copy_to_user((void *) arg, &vers, sizeof(vers))) 
 		rc = -EFAULT;
-		break;
+	break;
 	}
 	case AUDIO_GET_STATS: {
 		struct msm_audio_stats stats;
@@ -114,8 +114,8 @@ static long q6_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		pcm->buffer_size = config.buffer_size;
 		break;
 	}
-	case AUDIO_SET_INCALL: { 
-		struct msm_voicerec_mode voicerec_mode; 
+	case AUDIO_SET_INCALL: {
+		struct msm_voicerec_mode voicerec_mode;
 		if (copy_from_user(&voicerec_mode, (void *)arg,
 			sizeof(struct msm_voicerec_mode)))
 			return -EFAULT;
@@ -126,11 +126,11 @@ static long q6_in_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EINVAL;
 		} else
 			pcm->rec_mode = voicerec_mode.rec_mode;
-		break;
-	}
+			break;
+		}
 	case AUDIO_GET_CONFIG: {
 		struct msm_audio_config config;
-		config.buffer_size = pcm->buffer_size; 
+		config.buffer_size = pcm->buffer_size;
 		config.buffer_count = 2;
 		config.sample_rate = pcm->sample_rate;
 		config.channel_count = pcm->channel_count;
@@ -163,7 +163,8 @@ static int q6_in_open(struct inode *inode, struct file *file)
 	pcm->buffer_size = BUFSZ;
 	pcm->rec_mode = AUDIO_FLAG_READ;
 	file->private_data = pcm;
-	return 0; 
+	return 0;
+
 }
 
 static ssize_t q6_in_read(struct file *file, char __user *buf,

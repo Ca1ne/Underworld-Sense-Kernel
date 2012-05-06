@@ -208,7 +208,7 @@ static ssize_t q6_amrnb_in_read(struct file *file, char __user *buf,
 		res = -ENODEV;
 		goto fail;
 	}
-#if 1 
+#if 1
 	while (count > xfer) {
 		ab = ac->buf + ac->cpu_buf;
 
@@ -300,4 +300,3 @@ static int __init q6_amrnb_in_init(void)
 }
 
 device_initcall(q6_amrnb_in_init);
-
