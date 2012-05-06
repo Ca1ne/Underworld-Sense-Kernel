@@ -397,7 +397,7 @@ void __init supersonic_audio_init(void)
 	q6audio_register_analog_ops(&ops);
 #endif
 	acoustic_register_ops(&acoustic);
-	aboost = 0;
+	aboost = 1;
 }
 
 module_init(aboost_init);
