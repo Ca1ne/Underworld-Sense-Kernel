@@ -1362,32 +1362,6 @@ static struct platform_device *devices[] __initdata = {
 #endif
 };
 
-/* UART1 debug port init. This is supposed to be init in bootloader */
-static uint32_t supersonic_serial_debug_table[] = {
-	/* for uart debugger. It should be removed when support usb to serial function */
-	PCOM_GPIO_CFG(SUPERSONIC_GPIO_UART1_RX, 3, GPIO_INPUT, GPIO_NO_PULL, GPIO_4MA), /* RX */
-	PCOM_GPIO_CFG(SUPERSONIC_GPIO_UART1_TX, 3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* TX */
-};
-
-/* UART1 debug port init. This is supposed to be init in bootloader */
-static uint32_t supersonic_serial_debug_off_table[] = {
-	/* for uart debugger. It should be removed when support usb to serial function */
-	PCOM_GPIO_CFG(SUPERSONIC_GPIO_UART1_RX, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* RX */
-	PCOM_GPIO_CFG(SUPERSONIC_GPIO_UART1_TX, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* TX */
-};
-
-static void supersonic_config_serial_debug_gpios(int on)
-{
-	if (on){
-		config_gpio_table(supersonic_serial_debug_table, ARRAY_SIZE(supersonic_serial_debug_table));
-	}else{
-		config_gpio_table(supersonic_serial_debug_off_table, ARRAY_SIZE(supersonic_serial_debug_off_table));
-		/*gpio_set_value(SUPERSONIC_GPIO_UART1_RX, 0); *//* OL */
-		gpio_set_value(SUPERSONIC_GPIO_UART1_TX, 0); /* OL */
-	}
-	printk(KERN_INFO "supersonic_config_serial_debug_gpios %d  \n", on);
-}
-
 static struct msm_i2c_device_platform_data msm_i2c_pdata = {
 	.i2c_clock = 100000,
 	.clock_strength = GPIO_8MA,
