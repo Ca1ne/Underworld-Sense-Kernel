@@ -3357,4 +3357,11 @@ config KINETO_GAN
         help
           Virtual ethernet interface for Kineto GAN transport.
 
+config GAN_ETH
+	tristate "Kineto GAN compatibility"
+	depends on INET
+	default n
+	help
+	  Virtual ethernet interface for Kineto GAN transport.
+
 endif # NETDEVICES
