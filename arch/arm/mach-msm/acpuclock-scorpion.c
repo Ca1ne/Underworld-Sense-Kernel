@@ -101,7 +101,7 @@ struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 1113600, CCTL(CLK_TCXO, 1),  		SRC_SCPLL, 0x1D, 0, 1325, 128000 },
 	{ 1152000, CCTL(CLK_TCXO, 1), 	 	SRC_SCPLL, 0x1E, 0, 1350, 128000 },
 	{ 1190400, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1F, 0, 1350, 128000 },
-	{ 1228800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x20, 0, 1400, 128000 },
+	{ 1228800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x20, 0, 1350, 128000 },
 	{ 0 },
 };
 static unsigned long max_axi_rate;
