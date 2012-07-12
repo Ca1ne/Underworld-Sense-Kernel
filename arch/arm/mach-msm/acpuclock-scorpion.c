@@ -22,7 +22,6 @@
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
 #include <linux/regulator/consumer.h>
-#include <linux/regulator/driver.h>
 
 #include <mach/board.h>
 #include <mach/msm_iomap.h>
@@ -33,9 +32,6 @@
 #endif
 #include "proc_comm.h"
 #include "clock.h"
-#ifdef CONFIG_CPU_FREQ_VDD_LEVELS
-#include "board-supersonic.h"
-#endif
 
 #if 0
 #define DEBUG(x...) pr_info(x)
@@ -66,19 +62,6 @@ struct clkctl_acpu_speed {
 	unsigned axiclk_khz;
 };
 
-static unsigned long max_axi_rate;
-
-struct regulator {
-	struct device *dev;
-	struct list_head list;
-	int uA_load;
-	int min_uV;
-	int max_uV;
-	char *supply_name;
-	struct device_attribute dev_attr;
-	struct regulator_dev *rdev;
-};
-
 /* clock sources */
 #define CLK_TCXO	0 /* 19.2 MHz */
 #define CLK_GLOBAL_PLL	1 /* 768 MHz */
@@ -93,36 +76,35 @@ struct regulator {
 #define SRC_PLL1	3 /* 768 MHz */
 
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
-	{  19200, CCTL(CLK_TCXO, 1),		SRC_RAW, 0, 0, 1025, 14000},
-	{ 128000, CCTL(CLK_TCXO, 1),		SRC_AXI, 0, 0, 1025, 14000 },
-	{ 245000, CCTL(CLK_MODEM_PLL, 1),	SRC_RAW, 0, 0, 1050, 29000 },
-	/* Work arround for acpu resume hung, GPLL is turn off by arm9 */
-	/*{ 256000, CCTL(CLK_GLOBAL_PLL, 3),	SRC_RAW, 0, 0, 1050, 29000 },*/
-	{ 384000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0A, 0, 1050, 58000 },
-	{ 422400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0B, 0, 1050, 117000 },
-	{ 460800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0C, 0, 1050, 117000 },
-	{ 499200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0D, 0, 1075, 117000 },
-	{ 537600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0E, 0, 1100, 117000 },
-	{ 576000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0F, 0, 1100, 117000 },
-	{ 614400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x10, 0, 1125, 117000 },
-	{ 652800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x11, 0, 1150, 117000 },
-	{ 691200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x12, 0, 1175, 117000 },
-	{ 729600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x13, 0, 1200, 117000 },
-	{ 768000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x14, 0, 1200, 128000 },
-	{ 806400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x15, 0, 1225, 128000 },
-	{ 844800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x16, 0, 1250, 128000 },
-	{ 883200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x17, 0, 1275, 128000 },
-	{ 921600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x18, 0, 1300, 128000 },
-	{ 960000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x19, 0, 1300, 128000 },
-	{ 998400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1A, 0, 1300, 128000 },
-	{ 1036800, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1B, 0, 1300, 128000 },
-    { 1075200, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1C, 0, 1300, 128000 },
-    { 1113600, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1D, 0, 1300, 128000 },
-    { 1152000, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1E, 0, 1325, 128000 },
-    { 1190400, CCTL(CLK_TCXO, 1),           SRC_SCPLL, 0x1F, 0, 1325, 128000 },
+	{  19200, CCTL(CLK_TCXO, 1),		SRC_RAW, 0, 0, 925, 14000},
+	{ 128000, CCTL(CLK_TCXO, 1),		SRC_AXI, 0, 0, 925, 14000 },
+	{ 245000, CCTL(CLK_MODEM_PLL, 1),	SRC_RAW, 0, 0, 925, 29000 },
+	{ 384000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0A, 0, 975, 58000 },
+	{ 422400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0B, 0, 975, 117000 },
+	{ 460800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0C, 0, 1000, 117000 },
+	{ 499200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0D, 0, 1025, 117000 },
+	{ 537600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0E, 0, 1050, 117000 },
+	{ 576000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0F, 0, 1075, 117000 },
+	{ 614400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x10, 0, 1075, 117000 },
+	{ 652800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x11, 0, 1100, 117000 },
+	{ 691200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x12, 0, 1125, 117000 },
+	{ 729600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x13, 0, 1150, 117000 },
+	{ 768000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x14, 0, 1175, 128000 },
+	{ 806400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x15, 0, 1200, 128000 },
+	{ 844800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x16, 0, 1200, 128000 },
+	{ 883200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x17, 0, 1225, 128000 },
+	{ 921600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x18, 0, 1225, 128000 },
+	{ 960000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x19, 0, 1250, 128000 },
+	{ 998400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1A, 0, 1250, 128000 },
+	{ 1036800, CCTL(CLK_TCXO, 1),    	SRC_SCPLL, 0x1B, 0, 1300, 128000 },
+	{ 1075200, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1C, 0, 1300, 128000 },
+	{ 1113600, CCTL(CLK_TCXO, 1),  		SRC_SCPLL, 0x1D, 0, 1325, 128000 },
+	{ 1152000, CCTL(CLK_TCXO, 1), 	 	SRC_SCPLL, 0x1E, 0, 1350, 128000 },
+	{ 1190400, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1F, 0, 1350, 128000 },
 	{ 1228800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x20, 0, 1350, 128000 },
 	{ 0 },
 };
+static unsigned long max_axi_rate;
 
 /* select the standby clock that is used when switching scpll
  * frequencies
@@ -146,16 +128,15 @@ static void __init acpuclk_init_cpufreq_table(void)
 		freq_table[i].index = i;
 		freq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 
-		/* Define speeds that we want to skip */
+		/* Define Speeds to skip */
 		if (acpu_freq_tbl[i].acpu_khz == 19200 ||
-//				acpu_freq_tbl[i].acpu_khz == 128000 ||
 				acpu_freq_tbl[i].acpu_khz == 256000)
 			continue;
 
 		vdd = acpu_freq_tbl[i].vdd;
 		/* Allow mpll and the first scpll speeds */
 		if (acpu_freq_tbl[i].acpu_khz == acpu_mpll->acpu_khz ||
-				acpu_freq_tbl[i].acpu_khz == 384000) {
+				acpu_freq_tbl[i].acpu_khz == 245000) {
 			freq_table[i].frequency = acpu_freq_tbl[i].acpu_khz;
 			continue;
 		}
@@ -179,14 +160,15 @@ struct clock_state {
 	uint32_t			acpu_switch_time_us;
 	uint32_t			max_speed_delta_khz;
 	uint32_t			vdd_switch_time_us;
-	unsigned long		power_collapse_khz;
-	unsigned long		wait_for_irq_khz;
+	unsigned long			power_collapse_khz;
+	unsigned long			wait_for_irq_khz;
 	struct clk*			clk_ebi1;
-	struct regulator    *regulator;
-	int (*acpu_set_vdd)	(int mvolts);
+	struct regulator                *regulator;
+	int (*acpu_set_vdd)		(int mvolts);
 };
 
 static struct clock_state drv_state = { 0 };
+
 
 struct clk *clk_get(struct device *dev, const char *id);
 unsigned long clk_get_rate(struct clk *clk);
@@ -308,8 +290,6 @@ static void select_clock(unsigned src, unsigned config)
 
 static int acpu_set_vdd(int vdd)
 {
-	int rc = 0;
-
 	if (!drv_state.regulator || IS_ERR(drv_state.regulator)) {
 		drv_state.regulator = regulator_get(NULL, "acpu_vcore");
 		if (IS_ERR(drv_state.regulator)) {
@@ -321,13 +301,8 @@ static int acpu_set_vdd(int vdd)
 		}
 		pr_info("acpu_set_vdd got regulator\n");
 	}
-
-	rc = tps65023_set_dcdc1_level(drv_state.regulator->rdev, vdd);
-
-	if (rc == -ENODEV && vdd <= CONFIG_QSD_PMIC_DEFAULT_DCDC1)
-		return 0;
-
-	return rc;
+	vdd *= 1000; /* mV -> uV */
+	return regulator_set_voltage(drv_state.regulator, vdd, vdd);
 }
 
 static int acpuclk_set_vdd_level(int vdd)
@@ -443,7 +418,7 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 		mutex_unlock(&drv_state.lock);
 	}
 
-	return 0;
+	return rc;
 }
 
 static unsigned __init acpuclk_find_speed(void)
@@ -494,15 +469,15 @@ static void __init acpuclk_init(void)
 		BUG();
 	}
 
-	/* Move to 806MHz for boot, which is a safe frequency
+	/* Move to 998MHz for boot, which is a safe frequency
 	 * for all versions of Scorpion at the moment.
 	 */
 	speed = acpu_freq_tbl;
 	for (;;) {
-		if (speed->acpu_khz == 806400)
+		if (speed->acpu_khz == 998400)
 			break;
 		if (speed->acpu_khz == 0) {
-			pr_err("acpuclk_init: cannot find 806MHz\n");
+			pr_err("acpuclk_init: cannot find 998MHz\n");
 			BUG();
 		}
 		speed++;
@@ -567,7 +542,7 @@ unsigned long acpuclk_wait_for_irq(void)
 {
 	int ret = acpuclk_get_rate();
 	if (ret > drv_state.wait_for_irq_khz)
-		acpuclk_set_rate(drv_state.wait_for_irq_khz * 1000, 1);
+		acpuclk_set_rate(drv_state.wait_for_irq_khz * 1000, SETRATE_SWFI);
 	return ret * 1000;
 }
 
@@ -618,8 +593,8 @@ if (!acpu_avs_init(drv_state.acpu_set_vdd,
 #endif
 }
 
-#if defined(CONFIG_CPU_FREQ_VDD_LEVELS) && !defined(CONFIG_MSM_CPU_AVS)
-
+#ifdef CONFIG_CPU_FREQ_VDD_LEVELS
+#ifndef CONFIG_MSM_CPU_AVS
 ssize_t acpuclk_get_vdd_levels_str(char *buf)
 {
 	int i, len = 0;
@@ -636,23 +611,30 @@ ssize_t acpuclk_get_vdd_levels_str(char *buf)
 	return len;
 }
 
-void acpuclk_set_vdd(unsigned acpu_khz, int vdd)
+void acpuclk_set_vdd(unsigned acpu_khz, int max_vdd)
 {
 	int i;
-	vdd = vdd / 25 * 25;	//! regulator only accepts multiples of 25 (mV)
+	struct clkctl_acpu_speed *cur;
+	cur = drv_state.current_speed;
+	max_vdd = max_vdd / 25 * 25;//! regulator only accepts multiples of 25 (mV)
 	mutex_lock(&drv_state.lock);
 	for (i = 0; acpu_freq_tbl[i].acpu_khz; i++)
 	{
 		if (freq_table[i].frequency != CPUFREQ_ENTRY_INVALID)
 		{
-			if (acpu_khz == 0)
-				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + vdd), CONFIG_CPU_FREQ_VDD_LEVELS_MIN), CONFIG_CPU_FREQ_VDD_LEVELS_MAX);
-			else if (acpu_freq_tbl[i].acpu_khz == acpu_khz)
-				acpu_freq_tbl[i].vdd = min(max(vdd, CONFIG_CPU_FREQ_VDD_LEVELS_MIN), CONFIG_CPU_FREQ_VDD_LEVELS_MAX);
+			if (acpu_khz == 0) {
+				acpu_freq_tbl[i].vdd = min(max((acpu_freq_tbl[i].vdd + max_vdd), CONFIG_CPU_FREQ_VDD_LEVELS_MIN), CONFIG_CPU_FREQ_VDD_LEVELS_MAX);
+				if(cur->acpu_khz == acpu_freq_tbl[i].acpu_khz)
+					acpuclk_set_vdd_level(acpu_freq_tbl[i].vdd);
+			} else if (acpu_freq_tbl[i].acpu_khz == acpu_khz) {
+				acpu_freq_tbl[i].vdd = min(max(max_vdd, CONFIG_CPU_FREQ_VDD_LEVELS_MIN), CONFIG_CPU_FREQ_VDD_LEVELS_MAX);
+				if(cur->acpu_khz == acpu_freq_tbl[i].acpu_khz)
+					acpuclk_set_vdd_level(acpu_freq_tbl[i].vdd);
+			}
 		}
 	}
 	mutex_unlock(&drv_state.lock);
 }
 
 #endif
-
+#endif

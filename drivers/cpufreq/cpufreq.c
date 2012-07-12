@@ -651,101 +651,27 @@ static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 	return policy->governor->show_setspeed(policy, buf);
 }
 
-/**
- * show_scaling_driver - show the current cpufreq HW/BIOS limitation
- */
-static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
-{
-	unsigned int limit;
-	int ret;
-	if (cpufreq_driver->bios_limit) {
-		ret = cpufreq_driver->bios_limit(policy->cpu, &limit);
-		if (!ret)
-			return sprintf(buf, "%u\n", limit);
-	}
-	return sprintf(buf, "%u\n", policy->cpuinfo.max_freq);
-}
-
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
-#ifdef CONFIG_MSM_CPU_AVS
-extern ssize_t acpuclk_get_vdd_levels_havs_str(char *buf);
-static ssize_t show_vdd_levels_havs(struct cpufreq_policy *policy, char *buf)
-{
-	return acpuclk_get_vdd_levels_havs_str(buf);
-}
-
-int	atoi(char *string) {
-  int	retCode=0;
-  int	sign=1;
-
-  while (*string != 0) {
-    if (*string=='+') {
-      sign=1;
-    } else if (*string=='-') {
-      sign=-1;
-    } else if ((*string>='0') && (*string<='9')) {
-      retCode *= 10;
-      retCode += *string-'0';
-    } else {
-      break;
-    }
-    string++;
-  }
-
-  retCode *= sign;
-
-  return (retCode);
-}
-
-#define	SEPARATORS	"\t :"
-extern void acpuclk_set_vdd_havs(unsigned acpu_khz, int min_vdd, int max_vdd);
-static ssize_t store_vdd_levels_havs(struct cpufreq_policy *policy, const char *buf, size_t count)
-{
-  char	*fields[3]={0};
-  int	f, nbFields=0;
-
-  fields[0]=(char *)buf;
-  for (f=0; (f<count) && (nbFields<3); f++) {
-    if (strchr(SEPARATORS, buf[f]) != NULL) {
-      // new field
-      nbFields++;
-      while ((strchr(SEPARATORS, buf[f])!=NULL) && (f<count)) {
-	f++;
-      }
-      fields[nbFields]=(char *)&buf[f];
-    }
-  }
-  if (f==count) {
-    nbFields++;
-  }
-
-  dprintk("nbFields=%d\n", nbFields);
-  for (f=0; f<nbFields; f++) {
-    dprintk("Field%d=%s - val=%d\n", f, fields[f], atoi(fields[f]));
-  }
-
-  // 2 possibilities. Either we have 2 fields containing +/- values.
-  // Either we have 3 fields containing the frequency, new min, and new max
-  if (nbFields==2) {
-    acpuclk_set_vdd_havs(0, atoi(fields[0]), atoi(fields[1]));
-  } else if (nbFields==3) {
-    acpuclk_set_vdd_havs(atoi(fields[0]), atoi(fields[1]), atoi(fields[2]));
-  }
-
-  return count;
-}
-#else
 extern ssize_t acpuclk_get_vdd_levels_str(char *buf);
+#ifdef CONFIG_MSM_CPU_AVS
+static ssize_t show_vdd_levels_havs(struct cpufreq_policy *policy, char *buf)
+#else
 static ssize_t show_vdd_levels(struct cpufreq_policy *policy, char *buf)
+#endif
 {
 	return acpuclk_get_vdd_levels_str(buf);
 }
 
-extern void acpuclk_set_vdd(unsigned acpu_khz, int vdd);
+#ifdef CONFIG_MSM_CPU_AVS
+extern void acpuclk_set_vdd(unsigned acpu_khz, int min_vdd, int max_vdd);
+static ssize_t store_vdd_levels_havs(struct cpufreq_policy *policy, const char *buf, size_t count)
+#else
+extern void acpuclk_set_vdd(unsigned acpu_khz, int max_vdd);
 static ssize_t store_vdd_levels(struct cpufreq_policy *policy, const char *buf, size_t count)
+#endif
 {
 	int i = 0, j;
-	int pair[2] = { 0, 0 };
+	int pair[3] = { 0, 0, 0 };
 	int sign = 0;
 
 	if (count < 1)
@@ -775,7 +701,11 @@ static ssize_t store_vdd_levels(struct cpufreq_policy *policy, const char *buf, 
 			if (pair[j] != 0)
 			{
 				j++;
+#ifndef CONFIG_MSM_CPU_AVS
 				if ((sign != 0) || (j > 1))
+#else
+				if ((sign != 0) || (j > 2))
+#endif
 					break;
 			}
 		}
@@ -786,25 +716,48 @@ static ssize_t store_vdd_levels(struct cpufreq_policy *policy, const char *buf, 
 	if (sign != 0)
 	{
 		if (pair[0] > 0)
+#ifndef CONFIG_MSM_CPU_AVS
 			acpuclk_set_vdd(0, sign * pair[0]);
+#else
+			acpuclk_set_vdd(0, sign * pair[0], 0);
+#endif
 	}
 	else
 	{
-		if ((pair[0] > 0) && (pair[1] > 0))
+#ifndef CONFIG_MSM_CPU_AVS
+		if ((pair[0] > 0) && (pair[1] > 0)
 			acpuclk_set_vdd((unsigned)pair[0], pair[1]);
+#else
+		if ((pair[0] > 0) && (pair[1] > 0) && (pair[2] > 0))
+			acpuclk_set_vdd((unsigned)pair[0], pair[1], pair[2]);
+#endif
 		else
 			return -EINVAL;
 	}
 
 	return count;
 }
-#endif // AVS
-#endif // VDD_LEVELS
 
+#endif
+
+/**
+ * show_scaling_driver - show the current cpufreq HW/BIOS limitation
+ */
+static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
+{
+	unsigned int limit;
+	int ret;
+	if (cpufreq_driver->bios_limit) {
+		ret = cpufreq_driver->bios_limit(policy->cpu, &limit);
+		if (!ret)
+			return sprintf(buf, "%u\n", limit);
+	}
+	return sprintf(buf, "%u\n", policy->cpuinfo.max_freq);
+}
 
 cpufreq_freq_attr_ro_perm(cpuinfo_cur_freq, 0400);
-cpufreq_freq_attr_ro_perm(cpuinfo_min_freq, 0444);
-cpufreq_freq_attr_ro_perm(cpuinfo_max_freq, 0444);
+cpufreq_freq_attr_ro(cpuinfo_min_freq);
+cpufreq_freq_attr_ro(cpuinfo_max_freq);
 cpufreq_freq_attr_ro(cpuinfo_transition_latency);
 cpufreq_freq_attr_ro(scaling_available_governors);
 cpufreq_freq_attr_ro(scaling_driver);
