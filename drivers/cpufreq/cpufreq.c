@@ -92,21 +92,6 @@ EXPORT_SYMBOL_GPL(lock_policy_rwsem_read);
 lock_policy_rwsem(write, cpu);
 EXPORT_SYMBOL_GPL(lock_policy_rwsem_write);
 
-int trylock_policy_rwsem_write(int cpu) {
-	int policy_cpu = per_cpu(cpufreq_policy_cpu, cpu);
-	BUG_ON(policy_cpu == -1);
-	if (down_write_trylock(&per_cpu(cpu_policy_rwsem, policy_cpu))) {
-		if (cpu_online(cpu)) {
-			return 0;
-		}
-		else {
-			up_write(&per_cpu(cpu_policy_rwsem, policy_cpu));
-		}
-	}
-	return -1;
-}
-EXPORT_SYMBOL_GPL(trylock_policy_rwsem_write);
-
 void unlock_policy_rwsem_read(int cpu)
 {
 	int policy_cpu = per_cpu(cpufreq_policy_cpu, cpu);
@@ -1922,12 +1907,12 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 
 	memcpy(&policy->cpuinfo, &data->cpuinfo,
 				sizeof(struct cpufreq_cpuinfo));
-#ifndef CONFIG_PERFLOCK
+
 	if (policy->min > data->max || policy->max < data->min) {
 		ret = -EINVAL;
 		goto error_out;
 	}
-#endif
+
 	/* verify the cpu speed can be set within this limit */
 	ret = cpufreq_driver->verify(policy);
 	if (ret)

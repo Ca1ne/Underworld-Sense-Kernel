@@ -1763,13 +1763,6 @@ config ACPUCLOCK_DEBUG
 	help
 		Acpuclock freq/vdd adjustment in debugfs.
 
-config ACPUCLK_SET_RATE_DEBUG
-	bool "Enable debug timer for acpuclk_set_rate"
-	default n
-	help
-		Enable acpuclk_set_rate debug.
-		Will dump process stack which called acpuclk_set_rate
-
 config ACPUCLOCK_LIMIT_768MHZ
 	bool "Limit the CPU frequency at 768MHz"
 	default n
