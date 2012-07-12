@@ -32,7 +32,7 @@
 #include "avs.h"
 #endif
 #include "proc_comm.h"
-#include "clock.h"
+
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #include "board-supersonic.h"
 #endif
@@ -421,12 +421,12 @@ int acpuclk_set_rate(unsigned long rate, enum setrate_reason reason)
 
 	spin_unlock_irqrestore(&acpu_lock, flags);
 
-
+#ifndef CONFIG_AXI_SCREEN_POLICY
 	if (reason == SETRATE_CPUFREQ || reason == SETRATE_PC) {
 		if (cur->axiclk_khz != next->axiclk_khz)
 			clk_set_rate(drv_state.clk_ebi1, next->axiclk_khz * 1000);
 	}
-
+#endif
 	if (reason == SETRATE_CPUFREQ) {
 #ifdef CONFIG_MSM_CPU_AVS
 		/* notify avs after changing frequency */
@@ -606,9 +606,9 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	acpuclk_init();
 	acpuclk_init_cpufreq_table();
 	drv_state.clk_ebi1 = clk_get(NULL,"ebi1_clk");
-
+#ifndef CONFIG_AXI_SCREEN_POLICY
 	clk_set_rate(drv_state.clk_ebi1, drv_state.current_speed->axiclk_khz * 1000);
-
+#endif
 #ifdef CONFIG_MSM_CPU_AVS
 if (!acpu_avs_init(drv_state.acpu_set_vdd,
 	drv_state.current_speed->acpu_khz)) {
